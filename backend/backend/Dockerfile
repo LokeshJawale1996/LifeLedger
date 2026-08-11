@@ -6,8 +6,8 @@ COPY . .
 
 RUN chmod +x gradlew
 
-RUN ./gradlew clean build -x test
+RUN ./gradlew clean bootJar -x test
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "java -jar build/libs/*.jar"]
+CMD ["java", "-jar", "build/libs/backend-0.0.1-SNAPSHOT.jar"]
