@@ -8,36 +8,44 @@ function invalidIdResponse() {
   );
 }
 
-function extractIdFromUrl(url: string) {
-  const path = new URL(url).pathname;
-  const segments = path.split('/').filter(Boolean);
-  const lastSegment = segments[segments.length - 1];
-  if (lastSegment && lastSegment !== 'todos' && !Number.isNaN(Number(lastSegment))) {
-    return lastSegment;
-  }
-  return null;
+function isValidId(id?: string) {
+  return (
+    !!id &&
+    id !== 'undefined' &&
+    !Number.isNaN(Number(id))
+  );
 }
 
-function getId(params: { id?: string } | undefined, requestUrl: string) {
-  const id = params?.id;
-  if (id && id !== 'undefined' && !Number.isNaN(Number(id))) {
-    return id;
-  }
-  return extractIdFromUrl(requestUrl);
-}
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id?: string }> }
+) {
+  const { id } = await params;
 
-export async function PATCH(request: Request, { params }: { params: { id?: string } }) {
-  const id = getId(params, request.url);
-  if (!id) {
+  if (!isValidId(id)) {
     return invalidIdResponse();
   }
-  return proxyRequest(request, `/api/v1/todos/toggleCompletion/${id}`, 'PATCH');
+
+  return proxyRequest(
+    request,
+    `/api/v1/todos/toggleCompletion/${id}`,
+    'PATCH'
+  );
 }
 
-export async function DELETE(request: Request, { params }: { params: { id?: string } }) {
-  const id = getId(params, request.url);
-  if (!id) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id?: string }> }
+) {
+  const { id } = await params;
+
+  if (!isValidId(id)) {
     return invalidIdResponse();
   }
-  return proxyRequest(request, `/api/v1/todos/deleteById/${id}`, 'DELETE');
+
+  return proxyRequest(
+    request,
+    `/api/v1/todos/deleteById/${id}`,
+    'DELETE'
+  );
 }
