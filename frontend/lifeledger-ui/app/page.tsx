@@ -23,6 +23,14 @@ const features = [
 
   },
   {
+    title: "Calculator",
+    description: "Plan your finances with SIP, PPF, FD, RD, home loan, inflation, and everyday calculators.",
+    icon: "🧮",
+    accent: "from-violet-600 to-indigo-500",
+    href: "/features/calculator",
+    releaseNote: "released",
+  },
+  {
     title: "Borrowed / Lent",
     description: "Track who owes what so money conversations stay simple and transparent.",
     icon: "💸",
@@ -36,14 +44,6 @@ const features = [
     icon: "📈",
     accent: "from-cyan-600 to-sky-500",
     href: "/features/savings-tracker",
-    releaseNote: "coming soon"
-  },
-  {
-    title: "Calculator",
-    description: "Quickly calculate expenses, budgets, and everyday numbers on the go.",
-    icon: "🧮",
-    accent: "from-violet-600 to-indigo-500",
-    href: "/features/calculator",
     releaseNote: "coming soon"
   },
   {
