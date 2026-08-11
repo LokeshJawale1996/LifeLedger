@@ -1,0 +1,44 @@
+# =========================
+# Spring Boot / Gradle
+# =========================
+
+backend/.gradle/
+backend/build/
+backend/out/
+
+# =========================
+# Next.js
+# =========================
+
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# =========================
+# Environment files
+# =========================
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+backend/.env
+
+# =========================
+# IDE
+# =========================
+
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# =========================
+# OS
+# =========================
+
+.DS_Store
+Thumbs.db
