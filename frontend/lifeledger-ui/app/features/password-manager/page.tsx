@@ -38,6 +38,7 @@ function mapApiPasswordItem(item: ApiPasswordItem): PasswordItem {
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const raw = await response.text();
+
   if (!raw) {
     throw new Error(response.statusText || 'Unexpected empty response');
   }
@@ -51,112 +52,210 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 
 export default function PasswordManagerPage() {
   const [items, setItems] = useState<PasswordItem[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [error, setError] = useState('');
+
   const [search, setSearch] = useState('');
+
   const [showForm, setShowForm] = useState(false);
-  const [editingItem, setEditingItem] = useState<PasswordItem | null>(null);
+  const [editingItem, setEditingItem] =
+    useState<PasswordItem | null>(null);
+
   const [appName, setAppName] = useState('');
   const [webAddress, setWebAddress] = useState('');
   const [loginUserId, setLoginUserId] = useState('');
   const [password, setPassword] = useState('');
   const [note, setNote] = useState('');
+
   const [ownerId, setOwnerId] = useState<number | null>(null);
+
   const [showPassword, setShowPassword] = useState(false);
+
+  // ============================================================
+  // AUTHENTICATION
+  // ============================================================
 
   useEffect(() => {
     const session = getAuthSession();
-    const id = session?.user?.id ?? session?.user?.userId;
+
+    const id =
+      session?.user?.id ??
+      session?.user?.userId;
+
     if (id === undefined || id === null) {
       setOwnerId(null);
+      setItems([]);
       setLoading(false);
       return;
     }
 
     const numericUserId = Number(id);
+
     if (Number.isNaN(numericUserId)) {
       setOwnerId(null);
+      setItems([]);
       setLoading(false);
       return;
     }
 
     setOwnerId(numericUserId);
+
     loadCredentials(numericUserId);
   }, []);
+
+  // ============================================================
+  // LOAD CREDENTIALS
+  // ============================================================
 
   const loadCredentials = async (userId: number) => {
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`/api/password-manager/getByUserId/${userId}`);
+      const response = await fetch(
+        `/api/password-manager/getByUserId/${userId}`
+      );
+
       if (!response.ok) {
-        const errorBody = await parseJsonResponse<{ error?: string }>(response);
-        throw new Error(errorBody?.error || 'Unable to load credentials');
+        const errorBody =
+          await parseJsonResponse<{ error?: string }>(
+            response
+          );
+
+        throw new Error(
+          errorBody?.error ||
+          'Unable to load credentials'
+        );
       }
 
-      const data = await parseJsonResponse<ApiPasswordItem[]>(response);
+      const data =
+        await parseJsonResponse<ApiPasswordItem[]>(
+          response
+        );
+
       setItems(data.map(mapApiPasswordItem));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load credentials');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load credentials'
+      );
+
       setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // ============================================================
+  // OPEN ADD FORM
+  // ============================================================
+
   const openAddForm = () => {
+    if (!ownerId) {
+      return;
+    }
+
     setEditingItem(null);
+
     setAppName('');
     setWebAddress('');
     setLoginUserId('');
     setPassword('');
     setNote('');
+
     setShowPassword(false);
+
     setShowForm(true);
+
     setError('');
   };
 
+  // ============================================================
+  // OPEN EDIT FORM
+  // ============================================================
+
   const openEditForm = (item: PasswordItem) => {
+    if (!ownerId) {
+      return;
+    }
+
     setEditingItem(item);
+
     setAppName(item.appName);
     setWebAddress(item.webAddress);
     setLoginUserId(item.loginUserId);
     setPassword(item.password);
     setNote(item.note);
+
     setShowPassword(false);
+
     setShowForm(true);
+
     setError('');
   };
 
+  // ============================================================
+  // CLOSE FORM
+  // ============================================================
+
   const closeForm = () => {
     setShowForm(false);
+
     setEditingItem(null);
+
     setAppName('');
     setWebAddress('');
     setLoginUserId('');
     setPassword('');
     setNote('');
+
     setShowPassword(false);
+
     setError('');
   };
 
+  // ============================================================
+  // GENERATE PASSWORD
+  // ============================================================
+
   const generatePassword = () => {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    const characters =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+
     let generated = '';
 
     for (let i = 0; i < 16; i += 1) {
-      generated += characters.charAt(Math.floor(Math.random() * characters.length));
+      generated += characters.charAt(
+        Math.floor(
+          Math.random() * characters.length
+        )
+      );
     }
 
     setPassword(generated);
+
     setShowPassword(true);
   };
 
-  const handleSubmit = async (event: FormEvent) => {
+  // ============================================================
+  // SAVE / UPDATE
+  // ============================================================
+
+  const handleSubmit = async (
+    event: FormEvent
+  ) => {
     event.preventDefault();
-    if (!ownerId || !appName.trim() || !loginUserId.trim() || !password.trim()) {
+
+    if (
+      !ownerId ||
+      !appName.trim() ||
+      !loginUserId.trim() ||
+      !password.trim()
+    ) {
       return;
     }
 
@@ -172,78 +271,173 @@ export default function PasswordManagerPage() {
     };
 
     try {
+      // ========================================================
+      // UPDATE
+      // ========================================================
+
       if (editingItem) {
-        const response = await fetch(`/api/password-manager/updateById/${editingItem.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+        const response = await fetch(
+          `/api/password-manager/updateById/${editingItem.id}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          }
+        );
 
         if (!response.ok) {
-          const errorBody = await parseJsonResponse<{ error?: string }>(response);
-          throw new Error(errorBody?.error || 'Unable to update credential');
+          const errorBody =
+            await parseJsonResponse<{
+              error?: string;
+            }>(response);
+
+          throw new Error(
+            errorBody?.error ||
+            'Unable to update credential'
+          );
         }
-      } else {
-        const response = await fetch(`/api/password-manager/create?userId=${encodeURIComponent(String(ownerId))}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+      }
+
+      // ========================================================
+      // CREATE
+      // ========================================================
+
+      else {
+        const response = await fetch(
+          `/api/password-manager/create?userId=${encodeURIComponent(
+            String(ownerId)
+          )}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          }
+        );
 
         if (!response.ok) {
-          const errorBody = await parseJsonResponse<{ error?: string }>(response);
-          throw new Error(errorBody?.error || 'Unable to create credential');
+          const errorBody =
+            await parseJsonResponse<{
+              error?: string;
+            }>(response);
+
+          throw new Error(
+            errorBody?.error ||
+            'Unable to create credential'
+          );
         }
       }
 
       await loadCredentials(ownerId);
+
       closeForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save credential');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to save credential'
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  // ============================================================
+  // DELETE
+  // ============================================================
+
   const deleteItem = async (id: number) => {
     setError('');
 
     try {
-      const response = await fetch(`/api/password-manager/deleteById/${id}`, {
-        method: 'DELETE',
-      });
+      const confirmed = window.confirm(
+        'Are you sure you want to delete this credential?'
+      );
 
-      if (!response.ok) {
-        const errorBody = await parseJsonResponse<{ error?: string }>(response);
-        throw new Error(errorBody?.error || 'Unable to delete credential');
+      if (!confirmed) {
+        return;
       }
 
-      setItems((currentItems) => currentItems.filter((item) => item.id !== id));
+      const response = await fetch(
+        `/api/password-manager/deleteById/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!response.ok) {
+        const errorBody =
+          await parseJsonResponse<{
+            error?: string;
+          }>(response);
+
+        throw new Error(
+          errorBody?.error ||
+          'Unable to delete credential'
+        );
+      }
+
+      setItems((currentItems) =>
+        currentItems.filter(
+          (item) => item.id !== id
+        )
+      );
+
       if (editingItem?.id === id) {
         closeForm();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to delete credential');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to delete credential'
+      );
     }
   };
 
-  const copyToClipboard = async (value: string) => {
+  // ============================================================
+  // COPY
+  // ============================================================
+
+  const copyToClipboard = async (
+    value: string
+  ) => {
     try {
       await navigator.clipboard.writeText(value);
     } catch {
-      setError('Unable to copy to clipboard');
+      setError(
+        'Unable to copy to clipboard'
+      );
     }
   };
 
+  // ============================================================
+  // SEARCH
+  // ============================================================
+
   const filteredItems = useMemo(() => {
     const query = search.toLowerCase();
+
     return items.filter(
       (item) =>
-        item.appName.toLowerCase().includes(query) ||
-        item.loginUserId.toLowerCase().includes(query) ||
-        item.webAddress.toLowerCase().includes(query)
+        item.appName
+          .toLowerCase()
+          .includes(query) ||
+        item.loginUserId
+          .toLowerCase()
+          .includes(query) ||
+        item.webAddress
+          .toLowerCase()
+          .includes(query)
     );
   }, [items, search]);
+
+  // ============================================================
+  // UI
+  // ============================================================
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-6">
@@ -265,7 +459,7 @@ export default function PasswordManagerPage() {
               ← Back to home
             </Link>
 
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-700">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-600">
               Password Manager
             </p>
 
@@ -280,23 +474,46 @@ export default function PasswordManagerPage() {
 
           </div>
 
+          {/* =================================================
+              HEADER ACTION
+          ================================================= */}
 
-          {/* Add Button */}
+          {ownerId ? (
 
-          <button
-            type="button"
-            onClick={openAddForm}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-200 transition hover:-translate-y-0.5 hover:bg-slate-800"
-          >
-            <span className="text-xl leading-none">
-              +
-            </span>
+            <button
+              type="button"
+              onClick={openAddForm}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-200 transition hover:-translate-y-0.5 hover:bg-slate-800"
+            >
+              <span className="text-xl leading-none">
+                +
+              </span>
 
-            Add Credential
-          </button>
+              Add Credential
+            </button>
+
+          ) : (
+
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-200 transition hover:-translate-y-0.5 hover:bg-slate-800"
+            >
+              Sign in
+            </Link>
+
+          )}
 
         </div>
 
+        {/* =====================================================
+            ERROR
+        ====================================================== */}
+
+        {error ? (
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : null}
 
         {/* =====================================================
             SUMMARY
@@ -311,11 +528,10 @@ export default function PasswordManagerPage() {
             </p>
 
             <p className="mt-1 text-2xl font-bold">
-              {items.length}
+              {ownerId ? items.length : '—'}
             </p>
 
           </div>
-
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 
@@ -324,16 +540,31 @@ export default function PasswordManagerPage() {
             </p>
 
             <p className="mt-1 text-2xl font-bold text-emerald-600">
-              {items.length}
+              {ownerId ? items.length : '—'}
             </p>
 
           </div>
 
+          <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:col-span-1">
 
-          {/* Storage summary removed — data is persisted via backend */}
+            <p className="text-sm text-slate-500">
+              Status
+            </p>
+
+            <p
+              className={`mt-1 text-lg font-bold ${ownerId
+                ? 'text-emerald-600'
+                : 'text-orange-500'
+                }`}
+            >
+              {ownerId
+                ? 'Signed in'
+                : 'Sign in required'}
+            </p>
+
+          </div>
 
         </div>
-
 
         {/* =====================================================
             SAVED CREDENTIALS
@@ -341,7 +572,9 @@ export default function PasswordManagerPage() {
 
         <div>
 
-          {/* Header */}
+          {/* =================================================
+              SECTION HEADER
+          ================================================== */}
 
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
@@ -352,16 +585,18 @@ export default function PasswordManagerPage() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                {items.length} saved{' '}
-                {items.length === 1
-                  ? 'credential'
-                  : 'credentials'}
+                {ownerId
+                  ? `${items.length} saved ${items.length === 1
+                    ? 'credential'
+                    : 'credentials'
+                  }`
+                  : 'Sign in to view your saved credentials'}
               </p>
 
             </div>
 
+            {ownerId && items.length > 0 && (
 
-            {items.length > 0 && (
               <input
                 type="text"
                 value={search}
@@ -371,23 +606,57 @@ export default function PasswordManagerPage() {
                 placeholder="Search credentials..."
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 sm:w-64"
               />
+
             )}
 
           </div>
 
-
           {/* =================================================
-              LOADING / EMPTY STATE
+              LOADING
           ================================================== */}
 
           {loading ? (
-            <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center text-slate-500">Loading your credentials…</div>
-          ) : !ownerId ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-              <h2 className="text-lg font-semibold">Please log in to see your credentials</h2>
-              <p className="mt-2 text-sm text-slate-500">Your saved credentials are synced with your account.</p>
+
+            <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center text-slate-500">
+              Loading your credentials…
             </div>
+
+          ) : !ownerId ? (
+
+            /* =================================================
+               NOT LOGGED IN
+            ================================================== */
+
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-3xl">
+                🔐
+              </div>
+
+              <h2 className="mt-4 text-lg font-semibold">
+                Please log in to manage your credentials
+              </h2>
+
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                Your saved credentials are securely
+                synced with your account. Sign in to
+                view, add and manage your credentials.
+              </p>
+
+              <Link
+                href="/login"
+                className="mt-5 inline-flex rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Sign in
+              </Link>
+
+            </div>
+
           ) : items.length === 0 ? (
+
+            /* =================================================
+               NO CREDENTIALS
+            ================================================== */
 
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
 
@@ -409,86 +678,273 @@ export default function PasswordManagerPage() {
                 onClick={openAddForm}
                 className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                + Add Password
+                + Add Credential
               </button>
 
             </div>
 
-          ) : null}
+          ) : (
 
+            /* =================================================
+               CREDENTIAL LIST
+            ================================================== */
 
-          {/* =================================================
-              NO SEARCH RESULTS
-          ================================================== */}
+            <>
 
-          {items.length > 0 &&
-            filteredItems.length === 0 && (
+              {filteredItems.length === 0 ? (
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+                <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
 
-                <p className="font-semibold">
-                  No matching credentials
-                </p>
+                  <p className="font-semibold">
+                    No matching credentials
+                  </p>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Try searching for another
-                  application or website.
-                </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Try searching for another
+                    application or website.
+                  </p>
 
-              </div>
+                </div>
 
-            )}
+              ) : (
 
+                <div className="space-y-3">
 
-          {/* =================================================
-              CREDENTIAL LIST
-          ================================================== */}
+                  {filteredItems.map((item) => (
 
-          <div className="space-y-3">
+                    <div
+                      key={item.id}
+                      className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
+                    >
 
-            {filteredItems.map((item) => (
+                      <div className="flex flex-col gap-5">
 
-              <div
-                key={item.id}
-                className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
-              >
+                        {/* =================================================
+                            MAIN ROW
+                        ================================================== */}
 
-                <div className="flex flex-col gap-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
 
-                  {/* Main row */}
+                          {/* Website */}
 
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                          <div className="flex min-w-0 flex-1 items-center gap-4">
 
-                    {/* Website */}
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl">
+                              🔐
+                            </div>
 
-                    <div className="flex min-w-0 flex-1 items-center gap-4">
+                            <div className="min-w-0">
 
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl">
-                        🔐
-                      </div>
+                              <h3 className="truncate font-semibold">
+                                {item.appName}
+                              </h3>
 
-                      <div className="min-w-0">
+                              {item.webAddress ? (
 
-                        <h3 className="truncate font-semibold">
-                          {item.appName}
-                        </h3>
+                                <a
+                                  href={item.webAddress}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-1 block truncate text-xs text-slate-400 transition hover:text-emerald-600"
+                                >
+                                  {item.webAddress}
+                                </a>
 
-                        {item.webAddress ? (
+                              ) : (
 
-                          <a
-                            href={item.webAddress}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1 block truncate text-xs text-slate-400 transition hover:text-emerald-600"
-                          >
-                            {item.webAddress}
-                          </a>
+                                <p className="mt-1 text-xs text-slate-400">
+                                  No web address
+                                </p>
 
-                        ) : (
+                              )}
 
-                          <p className="mt-1 text-xs text-slate-400">
-                            No web address
-                          </p>
+                            </div>
+
+                          </div>
+
+                          {/* =================================================
+                              USER ID
+                          ================================================== */}
+
+                          <div className="sm:w-48">
+
+                            <p className="text-xs font-medium text-slate-400">
+                              USER ID
+                            </p>
+
+                            <div className="mt-1 flex items-center gap-2">
+
+                              <p className="truncate text-sm font-medium">
+                                {item.loginUserId}
+                              </p>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  copyToClipboard(
+                                    item.loginUserId
+                                  )
+                                }
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                title="Copy user ID"
+                              >
+                                ⧉
+                              </button>
+
+                            </div>
+
+                          </div>
+
+                          {/* =================================================
+                              PASSWORD
+                          ================================================== */}
+
+                          <div className="sm:w-40">
+
+                            <p className="text-xs font-medium text-slate-400">
+                              PASSWORD
+                            </p>
+
+                            <div className="mt-1 flex items-center gap-2">
+
+                              <p className="font-mono text-sm tracking-wider">
+                                ••••••••
+                              </p>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  copyToClipboard(
+                                    item.password
+                                  )
+                                }
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                title="Copy password"
+                              >
+                                ⧉
+                              </button>
+
+                            </div>
+
+                          </div>
+
+                          {/* =================================================
+                              ACTIONS
+                          ================================================== */}
+
+                          <div className="flex shrink-0 items-center gap-2">
+
+                            {/* Edit */}
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openEditForm(item)
+                              }
+                              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md"
+                              title="Edit credential"
+                              aria-label="Edit credential"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="h-4 w-4"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M12 20h9"
+                                />
+
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
+                                />
+                              </svg>
+                            </button>
+
+                            {/* Delete */}
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                deleteItem(item.id)
+                              }
+                              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-md"
+                              title="Delete credential"
+                              aria-label="Delete credential"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="h-4 w-4"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M3 6h18"
+                                />
+
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M8 6V4h8v2"
+                                />
+
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M19 6l-1 14H6L5 6"
+                                />
+
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M10 11v5M14 11v5"
+                                />
+                              </svg>
+                            </button>
+
+                          </div>
+
+                        </div>
+
+                        {/* =================================================
+                            NOTE
+                        ================================================== */}
+
+                        {item.note && (
+
+                          <div className="border-t border-slate-100 pt-4">
+
+                            <div className="flex items-start gap-3">
+
+                              <span className="text-sm">
+                                📝
+                              </span>
+
+                              <div className="min-w-0">
+
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                                  Note
+                                </p>
+
+                                <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                                  {item.note}
+                                </p>
+
+                              </div>
+
+                            </div>
+
+                          </div>
 
                         )}
 
@@ -496,197 +952,23 @@ export default function PasswordManagerPage() {
 
                     </div>
 
-
-                    {/* User ID */}
-
-                    <div className="sm:w-48">
-
-                      <p className="text-xs font-medium text-slate-400">
-                        USER ID
-                      </p>
-
-                      <div className="mt-1 flex items-center gap-2">
-
-                        <p className="truncate text-sm font-medium">
-                          {item.loginUserId}
-                        </p>
-
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(item.loginUserId)}
-                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                          title="Copy user ID"
-                        >
-                          ⧉
-                        </button>
-
-                      </div>
-
-                    </div>
-
-
-                    {/* Password */}
-
-                    <div className="sm:w-40">
-
-                      <p className="text-xs font-medium text-slate-400">
-                        PASSWORD
-                      </p>
-
-                      <div className="mt-1 flex items-center gap-2">
-
-                        <p className="font-mono text-sm tracking-wider">
-                          ••••••••
-                        </p>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            copyToClipboard(
-                              item.password
-                            )
-                          }
-                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                          title="Copy password"
-                        >
-                          ⧉
-                        </button>
-
-                      </div>
-
-                    </div>
-
-
-                    {/* Actions */}
-
-                    <div className="flex shrink-0 items-center gap-2">
-
-                      {/* Edit */}
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openEditForm(item)
-                        }
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md"
-                        title="Edit credential"
-                        aria-label="Edit credential"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          className="h-4 w-4"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 20h9"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
-                          />
-                        </svg>
-                      </button>
-
-
-                      {/* Delete */}
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          deleteItem(item.id)
-                        }
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-md"
-                        title="Delete credential"
-                        aria-label="Delete credential"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          className="h-4 w-4"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3 6h18"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M8 6V4h8v2"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M19 6l-1 14H6L5 6"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M10 11v5M14 11v5"
-                          />
-                        </svg>
-                      </button>
-
-                    </div>
-
-                  </div>
-
-
-                  {/* Note */}
-
-                  {item.note && (
-
-                    <div className="border-t border-slate-100 pt-4">
-
-                      <div className="flex items-start gap-3">
-
-                        <span className="text-sm">
-                          📝
-                        </span>
-
-                        <div className="min-w-0">
-
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                            Note
-                          </p>
-
-                          <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                            {item.note}
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                  )}
+                  ))}
 
                 </div>
 
-              </div>
+              )}
 
-            ))}
+            </>
 
-          </div>
+          )}
 
         </div>
 
       </div>
 
-
-      {/* =======================================================
+      {/* ==========================================================
           ADD / EDIT MODAL
-      ======================================================== */}
+      =========================================================== */}
 
       {showForm && (
 
@@ -719,9 +1001,6 @@ export default function PasswordManagerPage() {
 
               </div>
 
-
-              {/* Close */}
-
               <button
                 type="button"
                 onClick={closeForm}
@@ -732,7 +1011,6 @@ export default function PasswordManagerPage() {
               </button>
 
             </div>
-
 
             {/* =================================================
                 MODAL BODY
@@ -771,7 +1049,6 @@ export default function PasswordManagerPage() {
 
                   </div>
 
-
                   <div className="grid gap-4 sm:grid-cols-2">
 
                     {/* App Name */}
@@ -796,7 +1073,6 @@ export default function PasswordManagerPage() {
                       />
 
                     </div>
-
 
                     {/* Web Address */}
 
@@ -824,7 +1100,6 @@ export default function PasswordManagerPage() {
 
                 </div>
 
-
                 {/* =================================================
                     LOGIN DETAILS
                 ================================================== */}
@@ -851,7 +1126,6 @@ export default function PasswordManagerPage() {
 
                   </div>
 
-
                   <div className="space-y-5">
 
                     {/* User ID */}
@@ -866,14 +1140,15 @@ export default function PasswordManagerPage() {
                         type="text"
                         value={loginUserId}
                         onChange={(e) =>
-                          setLoginUserId(e.target.value)
+                          setLoginUserId(
+                            e.target.value
+                          )
                         }
                         placeholder="Enter your username or email"
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                       />
 
                     </div>
-
 
                     {/* Password */}
 
@@ -896,7 +1171,6 @@ export default function PasswordManagerPage() {
                         </button>
 
                       </div>
-
 
                       <div className="relative">
 
@@ -938,7 +1212,6 @@ export default function PasswordManagerPage() {
 
                 </div>
 
-
                 {/* =================================================
                     ADDITIONAL NOTES
                 ================================================== */}
@@ -966,7 +1239,6 @@ export default function PasswordManagerPage() {
 
                   </div>
 
-
                   <div>
 
                     <label className="mb-2 block text-sm font-semibold text-slate-700">
@@ -991,22 +1263,19 @@ export default function PasswordManagerPage() {
 
                     <p className="mt-2 text-xs text-slate-400">
                       Example: Recovery information,
-                      account details, or other useful
-                      notes.
+                      account details, security questions,
+                      or other useful notes.
                     </p>
 
                   </div>
 
                 </div>
 
-
                 {/* =================================================
                     BUTTONS
                 ================================================== */}
 
                 <div className="flex gap-3 pt-2">
-
-                  {/* Cancel */}
 
                   <button
                     type="button"
@@ -1016,21 +1285,21 @@ export default function PasswordManagerPage() {
                     Cancel
                   </button>
 
-
-                  {/* Save */}
-
                   <button
                     type="submit"
                     disabled={
                       !appName.trim() ||
                       !loginUserId.trim() ||
-                      !password.trim()
+                      !password.trim() ||
+                      saving
                     }
                     className="flex-1 rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {editingItem
-                      ? 'Save Changes'
-                      : 'Save'}
+                    {saving
+                      ? 'Saving...'
+                      : editingItem
+                        ? 'Save Changes'
+                        : 'Save'}
                   </button>
 
                 </div>
