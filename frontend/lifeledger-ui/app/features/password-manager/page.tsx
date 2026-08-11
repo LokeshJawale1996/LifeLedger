@@ -25,7 +25,9 @@ type ApiPasswordItem = {
   updatedAt?: string;
 };
 
-function mapApiPasswordItem(item: ApiPasswordItem): PasswordItem {
+function mapApiPasswordItem(
+  item: ApiPasswordItem
+): PasswordItem {
   return {
     id: item.id,
     appName: item.appName,
@@ -36,11 +38,22 @@ function mapApiPasswordItem(item: ApiPasswordItem): PasswordItem {
   };
 }
 
-async function parseJsonResponse<T>(response: Response): Promise<T> {
+/**
+ * Safely parse JSON.
+ *
+ * Some DELETE APIs return an empty response body.
+ * Therefore, an empty response should NOT be treated
+ * as an error when the HTTP status is successful.
+ */
+async function parseJsonResponse<T>(
+  response: Response
+): Promise<T> {
   const raw = await response.text();
 
   if (!raw) {
-    throw new Error(response.statusText || 'Unexpected empty response');
+    throw new Error(
+      response.statusText || 'Unexpected empty response'
+    );
   }
 
   try {
@@ -61,6 +74,7 @@ export default function PasswordManagerPage() {
   const [search, setSearch] = useState('');
 
   const [showForm, setShowForm] = useState(false);
+
   const [editingItem, setEditingItem] =
     useState<PasswordItem | null>(null);
 
@@ -70,9 +84,12 @@ export default function PasswordManagerPage() {
   const [password, setPassword] = useState('');
   const [note, setNote] = useState('');
 
-  const [ownerId, setOwnerId] = useState<number | null>(null);
+  const [ownerId, setOwnerId] = useState<number | null>(
+    null
+  );
 
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
 
   // ============================================================
   // AUTHENTICATION
@@ -121,12 +138,14 @@ export default function PasswordManagerPage() {
 
       if (!response.ok) {
         const errorBody =
-          await parseJsonResponse<{ error?: string }>(
-            response
-          );
+          await parseJsonResponse<{
+            error?: string;
+            message?: string;
+          }>(response);
 
         throw new Error(
           errorBody?.error ||
+          errorBody?.message ||
           'Unable to load credentials'
         );
       }
@@ -178,7 +197,9 @@ export default function PasswordManagerPage() {
   // OPEN EDIT FORM
   // ============================================================
 
-  const openEditForm = (item: PasswordItem) => {
+  const openEditForm = (
+    item: PasswordItem
+  ) => {
     if (!ownerId) {
       return;
     }
@@ -237,7 +258,6 @@ export default function PasswordManagerPage() {
     }
 
     setPassword(generated);
-
     setShowPassword(true);
   };
 
@@ -291,10 +311,12 @@ export default function PasswordManagerPage() {
           const errorBody =
             await parseJsonResponse<{
               error?: string;
+              message?: string;
             }>(response);
 
           throw new Error(
             errorBody?.error ||
+            errorBody?.message ||
             'Unable to update credential'
           );
         }
@@ -322,10 +344,12 @@ export default function PasswordManagerPage() {
           const errorBody =
             await parseJsonResponse<{
               error?: string;
+              message?: string;
             }>(response);
 
           throw new Error(
             errorBody?.error ||
+            errorBody?.message ||
             'Unable to create credential'
           );
         }
@@ -353,13 +377,12 @@ export default function PasswordManagerPage() {
     setError('');
 
     try {
-      const confirmed = window.confirm(
-        'Are you sure you want to delete this credential?'
-      );
-
-      if (!confirmed) {
-        return;
-      }
+      /**
+       * No window.confirm() here.
+       *
+       * Delete happens immediately when the user clicks
+       * the delete button.
+       */
 
       const response = await fetch(
         `/api/password-manager/deleteById/${id}`,
@@ -368,24 +391,64 @@ export default function PasswordManagerPage() {
         }
       );
 
-      if (!response.ok) {
-        const errorBody =
-          await parseJsonResponse<{
-            error?: string;
-          }>(response);
+      /**
+       * IMPORTANT:
+       *
+       * We check only the HTTP status here.
+       *
+       * A successful DELETE may return:
+       *
+       * 200 OK
+       * 202 Accepted
+       * 204 No Content
+       *
+       * In particular, 204 has an empty response body.
+       *
+       * Therefore we DO NOT call parseJsonResponse()
+       * for a successful DELETE.
+       */
 
-        throw new Error(
-          errorBody?.error ||
-          'Unable to delete credential'
-        );
+      if (!response.ok) {
+        let errorMessage =
+          'Unable to delete credential';
+
+        try {
+          const raw = await response.text();
+
+          if (raw) {
+            try {
+              const errorBody = JSON.parse(raw);
+
+              errorMessage =
+                errorBody?.error ||
+                errorBody?.message ||
+                errorMessage;
+            } catch {
+              errorMessage = raw;
+            }
+          }
+        } catch {
+          // Keep default error message
+        }
+
+        throw new Error(errorMessage);
       }
 
+      /**
+       * Backend deletion was successful.
+       *
+       * Immediately remove the credential from the UI.
+       */
       setItems((currentItems) =>
         currentItems.filter(
           (item) => item.id !== id
         )
       );
 
+      /**
+       * If the deleted credential was being edited,
+       * close the edit form.
+       */
       if (editingItem?.id === id) {
         closeForm();
       }
@@ -474,9 +537,7 @@ export default function PasswordManagerPage() {
 
           </div>
 
-          {/* =================================================
-              HEADER ACTION
-          ================================================= */}
+          {/* HEADER ACTION */}
 
           {ownerId ? (
 
@@ -572,10 +633,6 @@ export default function PasswordManagerPage() {
 
         <div>
 
-          {/* =================================================
-              SECTION HEADER
-          ================================================== */}
-
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
             <div>
@@ -595,25 +652,24 @@ export default function PasswordManagerPage() {
 
             </div>
 
-            {ownerId && items.length > 0 && (
+            {ownerId &&
+              items.length > 0 && (
 
-              <input
-                type="text"
-                value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
-                placeholder="Search credentials..."
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 sm:w-64"
-              />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) =>
+                    setSearch(e.target.value)
+                  }
+                  placeholder="Search credentials..."
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 sm:w-64"
+                />
 
-            )}
+              )}
 
           </div>
 
-          {/* =================================================
-              LOADING
-          ================================================== */}
+          {/* LOADING */}
 
           {loading ? (
 
@@ -623,9 +679,7 @@ export default function PasswordManagerPage() {
 
           ) : !ownerId ? (
 
-            /* =================================================
-               NOT LOGGED IN
-            ================================================== */
+            /* NOT LOGGED IN */
 
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
 
@@ -654,9 +708,7 @@ export default function PasswordManagerPage() {
 
           ) : items.length === 0 ? (
 
-            /* =================================================
-               NO CREDENTIALS
-            ================================================== */
+            /* NO CREDENTIALS */
 
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
 
@@ -685,9 +737,7 @@ export default function PasswordManagerPage() {
 
           ) : (
 
-            /* =================================================
-               CREDENTIAL LIST
-            ================================================== */
+            /* CREDENTIAL LIST */
 
             <>
 
@@ -719,13 +769,11 @@ export default function PasswordManagerPage() {
 
                       <div className="flex flex-col gap-5">
 
-                        {/* =================================================
-                            MAIN ROW
-                        ================================================== */}
+                        {/* MAIN ROW */}
 
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
 
-                          {/* Website */}
+                          {/* WEBSITE */}
 
                           <div className="flex min-w-0 flex-1 items-center gap-4">
 
@@ -762,9 +810,7 @@ export default function PasswordManagerPage() {
 
                           </div>
 
-                          {/* =================================================
-                              USER ID
-                          ================================================== */}
+                          {/* USER ID */}
 
                           <div className="sm:w-48">
 
@@ -795,9 +841,7 @@ export default function PasswordManagerPage() {
 
                           </div>
 
-                          {/* =================================================
-                              PASSWORD
-                          ================================================== */}
+                          {/* PASSWORD */}
 
                           <div className="sm:w-40">
 
@@ -828,13 +872,11 @@ export default function PasswordManagerPage() {
 
                           </div>
 
-                          {/* =================================================
-                              ACTIONS
-                          ================================================== */}
+                          {/* ACTIONS */}
 
                           <div className="flex shrink-0 items-center gap-2">
 
-                            {/* Edit */}
+                            {/* EDIT */}
 
                             <button
                               type="button"
@@ -867,7 +909,7 @@ export default function PasswordManagerPage() {
                               </svg>
                             </button>
 
-                            {/* Delete */}
+                            {/* DELETE */}
 
                             <button
                               type="button"
@@ -916,9 +958,7 @@ export default function PasswordManagerPage() {
 
                         </div>
 
-                        {/* =================================================
-                            NOTE
-                        ================================================== */}
+                        {/* NOTE */}
 
                         {item.note && (
 
@@ -976,9 +1016,7 @@ export default function PasswordManagerPage() {
 
           <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
 
-            {/* =================================================
-                MODAL HEADER
-            ================================================== */}
+            {/* MODAL HEADER */}
 
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5 sm:px-8">
 
@@ -1012,9 +1050,7 @@ export default function PasswordManagerPage() {
 
             </div>
 
-            {/* =================================================
-                MODAL BODY
-            ================================================== */}
+            {/* MODAL BODY */}
 
             <div className="overflow-y-auto px-6 py-6 sm:px-8">
 
@@ -1023,9 +1059,7 @@ export default function PasswordManagerPage() {
                 className="space-y-5"
               >
 
-                {/* =================================================
-                    APPLICATION / WEBSITE
-                ================================================== */}
+                {/* APPLICATION / WEBSITE */}
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
 
@@ -1051,7 +1085,7 @@ export default function PasswordManagerPage() {
 
                   <div className="grid gap-4 sm:grid-cols-2">
 
-                    {/* App Name */}
+                    {/* APP NAME */}
 
                     <div>
 
@@ -1074,7 +1108,7 @@ export default function PasswordManagerPage() {
 
                     </div>
 
-                    {/* Web Address */}
+                    {/* WEB ADDRESS */}
 
                     <div>
 
@@ -1100,9 +1134,7 @@ export default function PasswordManagerPage() {
 
                 </div>
 
-                {/* =================================================
-                    LOGIN DETAILS
-                ================================================== */}
+                {/* LOGIN DETAILS */}
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
 
@@ -1128,7 +1160,7 @@ export default function PasswordManagerPage() {
 
                   <div className="space-y-5">
 
-                    {/* User ID */}
+                    {/* USER ID */}
 
                     <div>
 
@@ -1150,7 +1182,7 @@ export default function PasswordManagerPage() {
 
                     </div>
 
-                    {/* Password */}
+                    {/* PASSWORD */}
 
                     <div>
 
@@ -1212,9 +1244,7 @@ export default function PasswordManagerPage() {
 
                 </div>
 
-                {/* =================================================
-                    ADDITIONAL NOTES
-                ================================================== */}
+                {/* ADDITIONAL NOTES */}
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
 
@@ -1271,9 +1301,7 @@ export default function PasswordManagerPage() {
 
                 </div>
 
-                {/* =================================================
-                    BUTTONS
-                ================================================== */}
+                {/* BUTTONS */}
 
                 <div className="flex gap-3 pt-2">
 
